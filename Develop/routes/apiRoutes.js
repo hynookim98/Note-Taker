@@ -23,3 +23,5 @@ router.delete('/notes/:id', (req, res) => {
         .then(() => res.json({ ok: true }))
         .catch((error) => res.status(500).json(error));
 });
+
+module.exports = router;
