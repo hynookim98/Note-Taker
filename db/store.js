@@ -1,57 +1,38 @@
-const util = require('util');
+const { promisify } = require('util');
 const fs = require('fs');
-// new package to generate unique IDs
-const uuidv1 = require('uuid/v1');
+const uuid = require('uuid/v1');
 
-const readFileSync = util.promisify(fs.readFile);
-const writeFileSync = util.promisify(fs.writeFile);
+const readFile = promisify(fs.readFile);
+const writeFile = promisify(fs.writeFile);
 
-class Store {
-    read() {
-        return readFileSync('db/db.json', 'utf8');
+class NoteStorage {
+  async getAll() {
+    try {
+      const data = await readFile('db/db.json', 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async add(note) {
+    const { title, text } = note;
+    if (!title || !text) {
+      throw new Error('Note title and text cannot be blank.');
     }
 
-    write(note) {
-        return writeFileSync('db/db.json', JSON.stringify(note));
-    }
+    const newNote = { title, text, id: uuid() };
+    const allNotes = await this.getAll();
+    const updatedNotes = [...allNotes, newNote];
+    await writeFile('db/db.json', JSON.stringify(updatedNotes));
+    return newNote;
+  }
 
-    getNotes() {
-        return this.read().then((notes) => {
-            let savedNotes;
-            
-            // try to turn saved notes into array 
-            try{
-                savedNotes = [].concat(JSON.parse(notes));
-            } catch(err) {
-                // if it can not be done then just return and empty array
-                savedNotes = [];
-            }
-
-            return savedNotes;
-        });
-    }
-
-    addNote(note) {
-        const { title, text } = note;
-        // following code will run if a title or text is not added
-        if (!title || !text) {
-            throw new Error("Note 'title' and 'text' cannot be blank")
-        }
-
-        // using the new npm package we add a unique ID to each note
-        const newNote = { title, text, id: uuidv1() };
-
-        return this.getNotes()
-            .then((notes) => [...notes, newNote])
-            .then((updatedNotes) => this.write(updatedNotes))
-            .then(() => newNote);
-    }
-
-    removeNote(id) {
-        return this.getNotes()
-            .then((notes) => notes.filter((note) => note.id !== id))
-            .then((filteredNotes) => this.write(filteredNotes));
-    }
+  async remove(id) {
+    const allNotes = await this.getAll();
+    const filteredNotes = allNotes.filter(n => n.id !== id);
+    await writeFile('db/db.json', JSON.stringify(filteredNotes));
+  }
 }
 
-module.exports = new Store();
+module.exports = new NoteStorage();
